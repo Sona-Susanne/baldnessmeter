@@ -13,6 +13,7 @@ import serial
 import time
 import math
 import sys
+from collections import deque
 
 
 def draw_hud_card(img, x, y, w, h, bg_color=(15, 15, 25), border_color=(0, 255, 255), alpha=0.85):
@@ -28,6 +29,32 @@ def draw_hud_card(img, x, y, w, h, bg_color=(15, 15, 25), border_color=(0, 255, 
     res = cv2.addWeighted(sub_img, 1.0 - alpha, card_rect, alpha, 0)
     img[y1:y2, x1:x2] = res
     cv2.rectangle(img, (x1, y1), (x2 - 1, y2 - 1), border_color, 1)
+
+
+def overlay_reaction_badge(frame, overlay_img, x, y, size=(120, 120)):
+    """Overlays a reaction image badge cleanly onto the frame with alpha channel support."""
+    if overlay_img is None:
+        return
+    try:
+        resized = cv2.resize(overlay_img, size)
+        h_ov, w_ov = resized.shape[:2]
+        h_frame, w_frame = frame.shape[:2]
+
+        if x + w_ov > w_frame or y + h_ov > h_frame or x < 0 or y < 0:
+            return
+
+        if resized.shape[2] == 4:
+            alpha_s = resized[:, :, 3] / 255.0
+            alpha_l = 1.0 - alpha_s
+            for c in range(0, 3):
+                frame[y:y+h_ov, x:x+w_ov, c] = (
+                    alpha_s * resized[:, :, c] + alpha_l * frame[y:y+h_ov, x:x+w_ov, c]
+                )
+        else:
+            frame[y:y+h_ov, x:x+w_ov] = resized
+    except Exception as e:
+        print(f"[Warning] Failed to overlay reaction badge: {e}")
+
 
 
 def get_ridiculous_classification(score):
@@ -97,12 +124,19 @@ def main():
 
     print("Webcam started. Press [SPACE] to trigger scan. Press 'q' to quit.")
 
+    # Load optional reaction badge images gracefully
+    img_safe = cv2.imread('safe.png', cv2.IMREAD_UNCHANGED)
+    img_warning = cv2.imread('warning.png', cv2.IMREAD_UNCHANGED)
+    img_danger = cv2.imread('danger.png', cv2.IMREAD_UNCHANGED)
+
     # State Machine Variables
     # States: "STANDBY", "SCANNING", "RESULT"
     state = "STANDBY"
-    scan_start_time = 0
+    scan_start_time = 0.0
+    result_start_time = 0.0
     SCAN_DURATION = 2.0  # seconds
 
+    ratio_buffer = deque(maxlen=10)
     sampled_ratios = []
     final_score = 0
     classification = ""
@@ -178,10 +212,12 @@ def main():
                     max_grad_idx = int(np.argmax(gradient))
                     y_hairline = y_top + max_grad_idx
 
-            # 2. Recalculate Forehead Proportion based on true visual hairline position:
+            # 2. Recalculate Forehead Proportion based on true visual hairline position with Moving Average Smoothing:
             forehead_h = abs(eyebrow_midpoint[1] - y_hairline)
             face_h = math.hypot(eyebrow_midpoint[0] - p152[0], eyebrow_midpoint[1] - p152[1])
-            current_ratio = forehead_h / max(0.001, face_h)
+            raw_ratio = forehead_h / max(0.001, face_h)
+            ratio_buffer.append(raw_ratio)
+            current_ratio = float(np.mean(ratio_buffer))
 
             # 3. Precise Forehead Polygon Crop & Canny Edge Texture
             poly_pts = np.array([p107, p67, p109, p10, p338, p297, p336], dtype=np.int32)
@@ -224,16 +260,17 @@ def main():
             elapsed_scan = now - scan_start_time
             if elapsed_scan >= SCAN_DURATION:
                 state = "RESULT"
+                result_start_time = now
 
                 if len(sampled_ratios) > 0:
                     # Temporal Median Filtering (Zero Drift) across 2-second scan
                     median_ratio = float(np.median(sampled_ratios))
                 else:
-                    median_ratio = 0.12
+                    median_ratio = current_ratio if current_ratio > 0 else 0.12
 
-                # Dynamic Visual Hairline Proportion Score Mapping (humorous threshold boost)
+                # Dynamic Visual Hairline Proportion Score Mapping (boosted comic curve)
                 calculated_score = (median_ratio - 0.08) * 210.0 + 10.0
-                boosted_score = (calculated_score * 1.4) + 15.0
+                boosted_score = (calculated_score * 1.45) + 22.0
                 final_score = int(round(np.clip(boosted_score, 0.0, 100.0)))
                 classification = get_ridiculous_classification(final_score)
                 status_label = get_hair_status_label(final_score)
@@ -248,6 +285,14 @@ def main():
                     except Exception as e:
                         print(f"[HARDWARE ERROR] Failed to send data to COM6: {e}")
 
+        elif state == "RESULT":
+            # Hold reading posture for 5.0 seconds in sync with hardware servo hold
+            elapsed_result = now - result_start_time
+            if elapsed_result >= 5.0:
+                state = "STANDBY"
+                sampled_ratios = []
+                ratio_buffer.clear()
+
         # --- Keyboard Inputs ---
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q') or key == 27:  # 'q' or ESC
@@ -257,9 +302,11 @@ def main():
                 state = "SCANNING"
                 scan_start_time = time.time()
                 sampled_ratios = []
+                ratio_buffer.clear()
             elif state == "RESULT":
                 state = "STANDBY"
                 sampled_ratios = []
+                ratio_buffer.clear()
 
         # --- Draw Non-Overlapping HUD UI ---
 
@@ -374,13 +421,19 @@ def main():
                 cv2.putText(frame, line_str, (cardB_x + 15, cardB_y + 24 + (i * 22)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (200, 230, 255), 1)
 
+            # Reaction Badge Overlay Card (Upper Right side of Cards A & B)
+            reaction_img = img_safe if final_score < 45 else (img_warning if final_score < 75 else img_danger)
+            if reaction_img is not None:
+                draw_hud_card(frame, 405, 70, 140, 140, bg_color=(12, 16, 24), border_color=score_color, alpha=0.9)
+                overlay_reaction_badge(frame, reaction_img, 415, 80, size=(120, 120))
+
             # Card C: Disclaimer Footer (Bottom of Screen)
             cardC_w, cardC_h = w_frame - 40, 46
             cardC_x = 20
             cardC_y = h_frame - 60
             draw_hud_card(frame, cardC_x, cardC_y, cardC_w, cardC_h, bg_color=(15, 15, 20), border_color=(0, 255, 255), alpha=0.9)
 
-            disclaimer_str = "DISCLAIMER: Absolutely no medical validity. Trust at your own risk."
+            disclaimer_str = f"DISCLAIMER: Absolutely no medical validity. Holding verdict ({max(0, int(5.0 - (now - result_start_time)))}s)..."
             cv2.putText(frame, disclaimer_str, (cardC_x + 15, cardC_y + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (200, 200, 200), 1)
             cv2.putText(frame, "PRESS [SPACE] FOR NEXT SUBJECT", (cardC_x + 15, cardC_y + 38),

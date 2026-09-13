@@ -2,8 +2,9 @@
  * Baldness-O-Meter Arduino Servo Gauge
  * =====================================
  * Reads serial input (0-100) over Serial (9600 baud),
- * flashes an LED on Pin 8, and maps the score to servo movement
- * on Pin 9 (0 to 180 degrees).
+ * flashes LED on Pin 8 according to threat tier,
+ * maps score to 90° -> 0° inverted servo range on Pin 9,
+ * and holds the verdict posture for 5 seconds.
  */
 
 #include <Servo.h>
@@ -13,7 +14,6 @@ const int LED_PIN = 8;
 const int SERVO_PIN = 9;
 
 Servo gaugeServo;
-int currentScore = 0;
 
 void setup() {
   // Initialize Serial communication at 9600 baud
@@ -26,16 +26,8 @@ void setup() {
   // Attach servo to Pin 9
   gaugeServo.attach(SERVO_PIN);
   
-  // Set initial gauge position (0 degrees = 0% baldness)
-  gaugeServo.write(0);
-  
-  // Startup LED flash test
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(100);
-    digitalWrite(LED_PIN, LOW);
-    delay(100);
-  }
+  // Set rest position directly to 90 degrees (Vertical / Safe baseline)
+  gaugeServo.write(90);
 }
 
 void loop() {
@@ -44,25 +36,51 @@ void loop() {
     // Read integer from serial stream
     int score = Serial.parseInt();
     
-    // Validate and constrain score to range 0-100
+    // Constrain score to valid 0-100 range
     score = constrain(score, 0, 100);
-    currentScore = score;
 
-    // Map score (0 - 100) to Servo angle (0 - 180 degrees)
-    int angle = map(currentScore, 0, 100, 0, 180);
-    
-    // Move servo to target angle
-    gaugeServo.write(angle);
+    // Strobe LED briefly to signal score receipt
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(LED_PIN, HIGH);
+      delay(50);
+      digitalWrite(LED_PIN, LOW);
+      delay(50);
+    }
 
-    // Flash LED on Pin 8 to signal update received
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
+    // Map score (0-100) to inverted Servo angle (90° down to 0°)
+    int targetAngle = map(score, 0, 100, 90, 0);
+    gaugeServo.write(targetAngle);
+
+    // Hold reading posture with tier LED feedback for 5 seconds (5000 ms)
+    unsigned long startTime = millis();
+    while (millis() - startTime < 5000) {
+      if (score < 45) {
+        // Tier 1 (<45): Solid ON
+        digitalWrite(LED_PIN, HIGH);
+        delay(100);
+      } else if (score < 75) {
+        // Tier 2 (45-74): Warning blinks (250ms ON / 250ms OFF)
+        digitalWrite(LED_PIN, HIGH);
+        delay(250);
+        digitalWrite(LED_PIN, LOW);
+        delay(250);
+      } else {
+        // Tier 3 (>=75): Rapid alert strobe (100ms ON / 100ms OFF)
+        digitalWrite(LED_PIN, HIGH);
+        delay(100);
+        digitalWrite(LED_PIN, LOW);
+        delay(100);
+      }
+    }
+
+    // After 5 seconds, return servo smoothly to rest position (90°) and turn off LED
+    gaugeServo.write(90);
     digitalWrite(LED_PIN, LOW);
-    
-    // Debug output back to serial monitor if connected
-    Serial.print("Received score: ");
-    Serial.print(currentScore);
-    Serial.print(" -> Servo Angle: ");
-    Serial.println(angle);
+
+    // Flush remaining serial input
+    while (Serial.available() > 0) {
+      Serial.read();
+    }
   }
 }
+
