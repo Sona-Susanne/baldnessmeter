@@ -80,15 +80,15 @@ def draw_hud_card(img, x, y, w, h, bg_color=(15, 15, 25), border_color=(0, 255, 
 
 
 def get_ridiculous_classification(score):
-    """Returns ridiculous classification title based on score tier."""
+    """Returns classification title based on score tier."""
     if score <= 25:
-        return "HAIR MAXIMIZER"
+        return "SAFE ZONE"
     elif score <= 50:
-        return "PARTIALLY AERODYNAMIC"
+        return "NE SOOKSHIKANAM"
     elif score <= 75:
-        return "CHROME-IN-TRAINING"
+        return "ORU FOOTBALL KALIKALLO IVIDE"
     else:
-        return "HAIR DLC REQUIRED"
+        return "NE TEERNU - YOU ARE DONE"
 
 
 def get_hair_status_label(score):
@@ -104,11 +104,11 @@ def get_hair_status_label(score):
 def get_scan_diagnostic_text(elapsed):
     """Returns progressive scientific diagnostic text synchronized across 2-second scan."""
     if elapsed < 0.4:
-        return "ANALYZING FOREHEAD GEOMETRY..."
+        return "NETTIYUDE VISTHEERTHAM ALAKKUNNU..."
     elif elapsed < 0.8:
-        return "DETECTING FOLLICULAR SIGNATURES..."
+        return "THALA MUDI THAPPUNNU (SCANNING)..."
     elif elapsed < 1.2:
-        return "CALCULATING AERODYNAMIC POTENTIAL..."
+        return "KATTINTE RESISTANCE CALCULATE CHEYYUNNU..."
     elif elapsed < 1.6:
         return "CONSULTING GLOBAL HAIR DATABASE..."
     else:
@@ -399,19 +399,18 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1)
 
             # Card B: Useless Statistics Card (Side / Lower Left)
-            cardB_w, cardB_h = 370, 118
+            cardB_w, cardB_h = 370, 105
             cardB_x = 20
             cardB_y = 172
             draw_hud_card(frame, cardB_x, cardB_y, cardB_w, cardB_h, bg_color=(12, 16, 24), border_color=(0, 255, 180), alpha=0.88)
 
             stat_line1 = f"HAIR NEEDED: {final_score * 68} UNITS"
-            stat_line2 = f"REGROWTH TIME: {int(final_score * 0.25)} BUSINESS YEARS"
-            stat_line3 = f"AERODYNAMIC RATING: {int(100 - final_score / 2.0)}%"
-            stat_line4 = f"COMB COMPATIBILITY: {max(5, 100 - final_score)}%"
-            stat_line5 = "AI CONFIDENCE: 17% | REASON: UNKNOWN"
+            stat_line2 = "ESTIMATED REGROWTH: ADUTHA JANMAM"
+            stat_line3 = "WIND RESISTANCE: OPTIMAL FOR FLIGHT"
+            stat_line4 = "AI CONFIDENCE: 11% | REASON: ARIYILLA"
 
-            for i, line_str in enumerate([stat_line1, stat_line2, stat_line3, stat_line4, stat_line5]):
-                cv2.putText(frame, line_str, (cardB_x + 15, cardB_y + 22 + (i * 20)),
+            for i, line_str in enumerate([stat_line1, stat_line2, stat_line3, stat_line4]):
+                cv2.putText(frame, line_str, (cardB_x + 15, cardB_y + 24 + (i * 22)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (200, 230, 255), 1)
 
             # Card C: Disclaimer Footer (Bottom of Screen)
@@ -420,10 +419,10 @@ def main():
             cardC_y = h_frame - 60
             draw_hud_card(frame, cardC_x, cardC_y, cardC_w, cardC_h, bg_color=(15, 15, 20), border_color=(0, 255, 255), alpha=0.9)
 
-            disclaimer_str = "DISCLAIMER: This measurement has absolutely no scientific validity. Thank you for trusting us anyway."
+            disclaimer_str = "DISCLAIMER: Absolutely no medical validity. Trust at your own risk."
             cv2.putText(frame, disclaimer_str, (cardC_x + 15, cardC_y + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (200, 200, 200), 1)
-            cv2.putText(frame, "Press [SPACE] to Scan Next Subject", (cardC_x + 15, cardC_y + 38),
+            cv2.putText(frame, "PRESS [SPACE] FOR NEXT SUBJECT", (cardC_x + 15, cardC_y + 38),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 255, 255), 2)
 
         cv2.imshow("Baldness-O-Meter 3000 (3D Mesh)", frame)
