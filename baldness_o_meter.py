@@ -2,7 +2,7 @@
 Baldness-O-Meter 3000
 =====================
 High-precision 3D MediaPipe Face Mesh follicle tracker with progressive "scientific"
-diagnostics, clean multi-card HUD results, Spacebar trigger workflow, and PySerial Arduino control.
+diagnostics, clean multi-card HUD results, Spacebar trigger workflow, and PySerial COM6 Arduino control.
 """
 
 import cv2
@@ -13,55 +13,6 @@ import serial
 import time
 import math
 import sys
-
-
-class ArduinoSerial:
-    """Manages Serial communication with Arduino on COM3 safely without crashing."""
-
-    def __init__(self, port="COM3", baudrate=9600):
-        self.port = port
-        self.baudrate = baudrate
-        self.ser = None
-        self.last_attempt_time = 0
-        self._connect()
-
-    def _connect(self):
-        self.last_attempt_time = time.time()
-        try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
-            print(f"[Serial] Successfully connected to Arduino on {self.port}")
-        except Exception as e:
-            self.ser = None
-
-    def send_score(self, score):
-        """Sends integer score to Arduino. Safe fallback if disconnected."""
-        if self.ser is None or not self.ser.is_open:
-            if time.time() - self.last_attempt_time > 5.0:
-                self._connect()
-            if self.ser is None:
-                return False
-
-        try:
-            data = f"{score}\n".encode('utf-8')
-            self.ser.write(data)
-            print(f"[Serial] Sent score {score} to {self.port}")
-            return True
-        except Exception as e:
-            print(f"[Serial Warning] Failed to send data: {e}")
-            if self.ser:
-                try:
-                    self.ser.close()
-                except Exception:
-                    pass
-            self.ser = None
-            return False
-
-    def close(self):
-        if self.ser and self.ser.is_open:
-            try:
-                self.ser.close()
-            except Exception:
-                pass
 
 
 def draw_hud_card(img, x, y, w, h, bg_color=(15, 15, 25), border_color=(0, 255, 255), alpha=0.85):
@@ -129,8 +80,14 @@ def main():
     # Initialize CLAHE contrast equalizer
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
-    # Initialize PySerial connection
-    arduino = ArduinoSerial(port="COM3", baudrate=9600)
+    # Initialize PySerial Connection directly on COM6
+    arduino = None
+    try:
+        arduino = serial.Serial('COM6', 9600, timeout=1)
+        time.sleep(2.0)  # Mandatory: wait for Arduino reboot cycle
+        print("[HARDWARE] Successfully connected to Arduino on COM6!")
+    except Exception as e:
+        print(f"[HARDWARE ERROR] Could not connect to COM6: {e}")
 
     # Open webcam
     cap = cv2.VideoCapture(0)
@@ -201,7 +158,6 @@ def main():
             p297 = get_pt(297)
 
             # 1. Dynamic Hairline Edge Finder along Forehead Midline:
-            # Extract vertical slice between eyebrow midpoint and landmark 10 (cranial top)
             x_mid = eyebrow_midpoint[0]
             y_top = min(p10[1], eyebrow_midpoint[1])
             y_brow = max(p10[1], eyebrow_midpoint[1])
@@ -275,17 +231,22 @@ def main():
                 else:
                     median_ratio = 0.12
 
-                # Dynamic Visual Hairline Proportion Score Mapping:
-                # Full hair / low hairline (ratio 0.08 - 0.15) -> 10% – 22%
-                # Standard hairline (ratio 0.16 - 0.28) -> 25% – 42%
-                # Visible recession / high forehead (ratio 0.30 - 0.45+) -> 50% – 85%
+                # Dynamic Visual Hairline Proportion Score Mapping (with baseline sensitivity boost)
                 raw_score = (median_ratio - 0.08) * 210.0 + 10.0
-                final_score = int(round(np.clip(raw_score, 10.0, 92.0)))
+                boosted_score = raw_score + 18.0
+                final_score = int(round(np.clip(boosted_score, 0.0, 100.0)))
                 classification = get_ridiculous_classification(final_score)
                 status_label = get_hair_status_label(final_score)
 
-                # Send score to Arduino ONCE upon locking result
-                arduino.send_score(final_score)
+                # Send score directly to COM6 Arduino ONCE upon locking result
+                if arduino and arduino.is_open:
+                    try:
+                        payload = f"{int(final_score)}\n".encode('utf-8')
+                        arduino.write(payload)
+                        arduino.flush()
+                        print(f"[HARDWARE] Sent score {int(final_score)} to COM6")
+                    except Exception as e:
+                        print(f"[HARDWARE ERROR] Failed to send data to COM6: {e}")
 
         # --- Keyboard Inputs ---
         key = cv2.waitKey(1) & 0xFF
@@ -324,8 +285,8 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.36, (0, 255, 0), 1)
 
         # 3. Serial Status Badge (Bottom-Right)
-        com_connected = (arduino.ser and arduino.ser.is_open)
-        com_str = f"COM3: {'CONNECTED' if com_connected else 'DISCONNECTED'}"
+        com_connected = (arduino is not None and arduino.is_open)
+        com_str = f"COM6: {'CONNECTED' if com_connected else 'DISCONNECTED'}"
         com_color = (0, 255, 0) if com_connected else (0, 0, 255)
         draw_hud_card(frame, w_frame - 200, h_frame - 35, 180, 25, bg_color=(10, 10, 15), border_color=com_color, alpha=0.85)
         cv2.putText(frame, com_str, (w_frame - 192, h_frame - 18),
@@ -430,7 +391,9 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
     face_mesh.close()
-    arduino.close()
+    if arduino and arduino.is_open:
+        arduino.close()
+        print("[HARDWARE] Serial connection on COM6 closed cleanly.")
     print("=== Baldness-O-Meter Terminated Gracefully ===")
 
 
