@@ -231,9 +231,9 @@ def main():
                 else:
                     median_ratio = 0.12
 
-                # Dynamic Visual Hairline Proportion Score Mapping (with baseline sensitivity boost)
-                raw_score = (median_ratio - 0.08) * 210.0 + 10.0
-                boosted_score = raw_score + 18.0
+                # Dynamic Visual Hairline Proportion Score Mapping (humorous threshold boost)
+                calculated_score = (median_ratio - 0.08) * 210.0 + 10.0
+                boosted_score = (calculated_score * 1.4) + 15.0
                 final_score = int(round(np.clip(boosted_score, 0.0, 100.0)))
                 classification = get_ridiculous_classification(final_score)
                 status_label = get_hair_status_label(final_score)
