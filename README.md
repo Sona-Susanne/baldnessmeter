@@ -1,97 +1,82 @@
 <img width="1280" height="640" alt="git (1)" src="https://github.com/user-attachments/assets/8920b256-2ba8-4988-b824-5351134eb4bd" />
 
-
-
-# [Project Name] 🎯
-
+# Baldness-o-Meter 
 
 ## Basic Details
-### Team Name: [Name]
-
+### Team Name: Askaban Asteroid
 
 ### Team Members
-- Team Lead: [Name] - [College]
-- Member 2: [Name] - [College]
-- Member 3: [Name] - [College]
+- Team Lead: Sona Susan Jacob - Saintgits College of Engineering
 
 ### Project Description
-[2-3 lines about what your project does]
+An AI-powered diagnostic and physical hardware gauge that quantifies cranial follicular density in real-time. By leveraging computer vision and aerodynamic facial geometry estimation, it transmits severe scalp reality checks directly to a physical servo dial and diagnostic LED array.
 
 ### The Problem (that doesn't exist)
-[What ridiculous problem are you solving?]
+In a world overflowing with optical illusions and deceptive camera angles, unsuspecting individuals live under the catastrophic delusion that their forehead is merely "broad" rather than an international football ground. Humanity has long suffered from the lack of an unscientific, overly sensitive, Malayalam-calibrated physical meter to call out receding hairlines before gentle breezes cause irreversible aerodynamic drag.
 
 ### The Solution (that nobody asked for)
-[How are you solving it? Keep it fun!]
+The Baldness-o-Meter pairs a webcam with MediaPipe 3D face mesh tracking to calculate forehead surface area with an exaggerated sensitivity curve. The calculated hazard score is displayed across a cyberpunk HUD in native Manglish commentary and dispatched via USB Serial (COM6) to an Arduino Uno, driving a servo needle across a 3-tier calibrated paper dial ranging from "25-45% BALD" to "50-70% BALD" and finally "75-100% BALD (DANGER ZONE)".
+
+---
 
 ## Technical Details
 ### Technologies/Components Used
 For Software:
-- [Languages used]
-- [Frameworks used]
-- [Libraries used]
-- [Tools used]
+- Languages: Python 3.10+, C++ (Arduino Wiring)
+- Frameworks: OpenCV (`cv2`)
+- Libraries: MediaPipe (FaceMesh / 3D Facial Geometry), PySerial, NumPy
+- Tools: VS Code, Arduino IDE, Git & GitHub
 
 For Hardware:
-- [List main components]
-- [List specifications]
-- [List tools required]
+- Main Components:
+  - Arduino Uno Rev3
+  - TowerPro SG90 9g Micro Servo Motor
+  - 5mm Red Diagnostic Indicator LED
+  - 220Ω Resistor
+  - Breadboard & Jumper Wires
+  - Custom Calibrated 3-Sector Paper Gauge (Top-to-Right sweep)
+- Specifications:
+  - Baud Rate: 9600 bps over Serial (COM6)
+  - Needle Sweep: Vertical/Top (25-45% BALD) to Horizontal/Right (75-100% BALD DANGER ZONE)
+  - Operating Voltage: 5V DC via USB
+- Tools Required: USB Type-A to Type-B cable, Marker pen, Paper card stock
+
+---
+
+### How the Computer Vision Works (The Facial Ratio Algorithm)
+
+The system uses **MediaPipe Face Mesh** with OpenCV to track 468 landmark coordinates across the user's face in real-time. Rather than measuring raw pixels (which change when leaning closer or further from the camera), it calculates an invariant **geometric vertical ratio**:
+
+1. **Landmark Extraction:**
+   - **Mid-Eyebrow Center:** Landmark 9 (glabella / brow line)
+   - **Trichion / Upper Forehead Boundary:** Landmark 10 (top-most scalp tracker)
+   - **Chin Base (Menton):** Landmark 152 (bottom tip of the jaw)
+
+2. **Distance Calculations:**
+   - **Forehead Height ($H_{\text{forehead}}$):** Euclidean vertical distance between the eyebrow line (Landmark 9) and the upper forehead boundary (Landmark 10).
+   - **Total Facial Height ($H_{\text{face}}$):** Euclidean vertical distance between the chin base (Landmark 152) and the upper forehead boundary (Landmark 10).
+
+3. **Ratio Metric & Sensitivity Scaling:**
+   $$\text{Forehead Ratio} = \frac{H_{\text{forehead}}}{H_{\text{face}}}$$
+   - In classical facial aesthetics (the Rule of Thirds), the forehead should occupy approximately **33%** ($\sim 0.33$) of total vertical face height.
+   - The algorithm normalizes any ratio above the aesthetic baseline and applies a non-linear sensitivity scaling multiplier:
+   $$\text{Raw Score} = \left(\frac{\text{Forehead Ratio} - 0.22}{0.18}\right) \times 100$$
+   $$\text{Final Exaggerated Score} = \text{clamp}((\text{Raw Score} \times 1.4) + 20,\ 0,\ 100)$$
+   This ensures minor natural hairline variations immediately boost the output into the humorous **"50-70% BALD"** or **"75-100% BALD (DANGER ZONE)"** thresholds.
+
+---
 
 ### Implementation
 For Software:
+
 # Installation
-[commands]
+```bash
+# Clone the repository
+git clone <your-repository-url>
+cd baldness_o_meter
 
-# Run
-[commands]
-
-### Project Documentation
-For Software:
-
-# Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
-*Add caption explaining what this shows*
-
-![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
-
-![Screenshot3](Add screenshot 3 here with proper name)
-*Add caption explaining what this shows*
-
-# Diagrams
-![Workflow](Add your workflow/architecture diagram here)
-*Add caption explaining your workflow*
-
-For Hardware:
-
-# Schematic & Circuit
-![Circuit](Add your circuit diagram here)
-*Add caption explaining connections*
-
-![Schematic](Add your schematic diagram here)
-*Add caption explaining the schematic*
-
-# Build Photos
-![Components](Add photo of your components here)
-*List out all components shown*
-
-![Build](Add photos of build process here)
-*Explain the build steps*
-
-![Final](Add photo of final product here)
-*Explain the final build*
-
-### Project Demo
-# Video
-[Add your demo video link here]
-*Explain what the video demonstrates*
-
-# Additional Demos
-[Add any extra demo materials/links]
-
-## Team Contributions
-- [Name 1]: [Specific contributions]
-- [Name 2]: [Specific contributions]
-- [Name 3]: [Specific contributions]
+# Install dependencies
+pip install opencv-python mediapipe pyserial numpy
 
 ---
 Made with ❤️ at TinkerHub Useless Projects 
